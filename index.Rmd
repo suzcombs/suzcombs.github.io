@@ -4,16 +4,14 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(xaringan)
 ```
 
-## [ABOUT ME](./about-me) | [CV](./about-me/Fearn_CV.pdf) | [BIOL-3100-Final-Project](./BIOL-3100-Final.html)##
+## [ABOUT ME](./media/26608295.jpg) | [CV](./media/26608295.jpg) | [BIOL-3100-Final-Project](./BIOL-3100-Final.html)##
 
 # **Suzanne Combs - Bioinformatics Student** #
 
-```{r, out.width="60%", echo=FALSE}
+```{r echo=FALSE, fig.width=5,fig.height=5}
 knitr::include_graphics("./media/portrait.jpg")
 ```
-
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 

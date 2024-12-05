@@ -4,92 +4,287 @@ subtitle: "BIOL 3100 - Final Project"
 output: 
   html_document:
     code_folding: hide
-date: "2024-12-02"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 # Load packages
 library(tidyverse)
-library(modelr)
-library(janitor)
+library(skimr)
+library(broom)
+library(plotly)
+library(RColorBrewer)
 library(patchwork)
-
-
+library(easystats)
+library(modelr)
 ```
 
-# Background
+#Background
+#Talking about why I chose this topic
+#Why is this important?
+#What was my question(s)?
+#Talk about the data set(s) that I used
 
 ```{r, include=FALSE}
 # Load the data
-df <- read_csv("./Sleep_health_and_lifestyle_dataset.csv")
+df <- read_csv("./csv/clean_data/Sleep_Efficiency_Clean.csv")
 
-## Clean the data
-df_clean <- clean_names(df)
+df$gender <- as.factor(df$gender)
+df$smoking_status <- as.factor(df$smoking_status)
+df$sleep_type <- as.factor(df$sleep_type)
+```
 
-# Separate the blood pressure into systolic and diastolic
-df_clean <- df_clean %>% 
-  separate(blood_pressure, into = c("systolic", "diastolic"), sep = "/")
+#Talk about the cleaning. This dataset I cleaned in a different file and imported the cleaned data
+#Doing a A little more cleaning...
+#Change data types to factors
 
-# Change the data types to be factors or numeric
-df_clean$gender <- as.factor(df_clean$gender)
-df_clean$occupation <- as.factor(df_clean$occupation)
-df_clean$bmi_category <- as.factor(df_clean$bmi_category)
-df_clean$sleep_disorder <- as.factor(df_clean$sleep_disorder)
-df_clean$systolic <- as.numeric(df_clean$systolic)
-df_clean$diastolic <- as.numeric(df_clean$diastolic)
+#Take a quick look at the data frame using skim
+```{r, echo=FALSE}
+skim(df) # Take this out?
+```
+
+#I was interested to see if bedtime would effect sleep efficiency (what that is...)
+```{r,fig.width=5.5,fig.height=6.5}
+# Plot of bedtime effect on sleep efficiency
+bed_plot1 <- df %>% 
+  ggplot(aes(x=factor(bedtime), y=sleep_efficiency, color=factor(bedtime))) +
+  geom_point() +
+  scale_x_discrete(labels=c("9:00 p.m.", "9:30 p.m.", "10:00 p.m.", "10:30 p.m.", "11:00 p.m.", "12:00 a.m.",
+                            "12:30 a.m.", "1:00 a.m.", "1:30 a.m.", "2:00 a.m.", "2:30 a.m.")) +
+  labs(x="Bedtime", y="Sleep Efficiency Proportion", title="Scatterplot of Bedtime's Effect on Sleep Efficiency") +
+  theme_minimal()
+
+# Interactive plot
+ggplotly(bed_plot1)
 
 ```
 
-# Visualization 
+#This didn't show what I thought it would. It doesn't appear like sleep efficiency is effected much by bedtime
+#Let's create some models to see what does effect sleep efficiency!
+# I want to see the effects from REM sleep from the sleep_type_percentage column
 
 ```{r}
-df_clean %>% 
-  ggplot(aes(x=stress_level, y = quality_of_sleep, color=occupation)) +
-  geom_jitter() +
-  geom_smooth(method="lm", se=FALSE) +
-  facet_wrap(~occupation, scales="free")
+rem_df <- df %>% 
+  filter(sleep_type == "REM")
 
-df_clean %>% 
-  ggplot(aes(x=gender, y = quality_of_sleep, fill=gender)) +
-  geom_violin() 
+mod1REM <- glm(data=rem_df, formula = sleep_efficiency ~ age + gender + 
+             sleep_duration + awakenings + caffeine_consumption + 
+             alcohol_consumption + smoking_status + exercise_frequency + sleep_type_percentage + bedtime)
+tidy(mod1REM) %>% 
+  kableExtra::kable() %>% 
+  kableExtra::kable_classic(lightable_options = 'hover')
+```
+#REM is not significant on sleep_efficiency, so we will not use that one
 
-df_clean %>% 
-  ggplot(aes(x=age, y = quality_of_sleep, color=(gender))) +
-  geom_jitter(alpha=0.75) +
-  geom_smooth(se=FALSE, method="lm")
+#Instead I tried Deep Sleep
+```{r}
+deep_df <- df %>% 
+  filter(sleep_type == "Deep") # Time in deep sleep significant. REM is not
 
-df_clean %>% 
-  ggplot(aes(x=age, y = quality_of_sleep)) +
+mod1 <- lm(data=deep_df, formula = sleep_efficiency ~ age + gender + 
+                sleep_duration + awakenings + caffeine_consumption + 
+                alcohol_consumption + smoking_status + exercise_frequency + sleep_type_percentage + bedtime)
+tidy(mod1) %>% 
+  kableExtra::kable() %>% 
+  kableExtra::kable_classic(lightable_options = 'hover')
+```
+
+#Deep Sleep is significant
+#All others that are ***: Age, Awakenings, Alcohol Consumption, Smoking_Status(Yes)
+#**: Caffeine_consumption, exercise_frequency
+#Things that surprised me: Gender not making a difference, Bedtime of course, Sleep duration (I would have thought that the longer you slept the more quality of sleep you'd have)
+
+#Plot ** and ***
+#age
+```{r, message=FALSE}
+p1 <- deep_df %>% 
+  ggplot(aes(x=age, y = sleep_efficiency)) + 
+  geom_point(color="steelblue") +
+  geom_smooth(color="darkgreen", se=FALSE) +
+  theme_minimal()
+ggplotly(p1)
+
+# Another look
+deep_df %>% 
+  ggplot(aes(x=age, y = sleep_efficiency, color=factor(awakenings))) +
+  geom_point() +
+  geom_smooth(se=FALSE, method="lm") 
+```
+
+#awakenings
+```{r, message=FALSE}
+p2 <- deep_df %>% 
+  filter(!is.na(awakenings)) %>% 
+  ggplot(aes(x=factor(awakenings), y = sleep_efficiency, fill=factor(awakenings))) + # Remove the legend. Get rid of NA
+  geom_violin() +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2")
+ggplotly(p2)
+
+df %>% 
+  filter(!is.na(awakenings)) %>% 
+  ggplot(aes(x=factor(awakenings), y = sleep_efficiency, fill=factor(awakenings))) + # Drop NA. Maybe better as a color or facet
+  geom_boxplot()
+```
+
+#alcohol
+```{r, message=FALSE}
+p3 <- deep_df %>% 
+  filter(!is.na(alcohol_consumption)) %>% 
+  ggplot(aes(x=factor(alcohol_consumption), y = sleep_efficiency, fill=factor(alcohol_consumption))) + # Remove the legend. Get rid of NA
+  geom_violin() +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2")
+ggplotly(p3)
+
+deep_df %>% 
+  filter(!is.na(alcohol_consumption)) %>% 
+  ggplot(aes(x=factor(alcohol_consumption), y = sleep_efficiency, fill=factor(alcohol_consumption))) + 
+  geom_boxplot()
+```
+
+#smoking
+```{r, message=FALSE}
+p4 <- deep_df %>% 
+  ggplot(aes(x=factor(smoking_status), y = sleep_efficiency, fill=factor(smoking_status))) + # Remove the legend. Get rid of NA
+  geom_violin() +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2")
+ggplotly(p4)
+```
+
+#exercise
+```{r, message=FALSE}
+p5 <- deep_df %>% 
+  filter(!is.na(exercise_frequency)) %>% 
+  ggplot(aes(x=factor(exercise_frequency), y = sleep_efficiency, fill=factor(exercise_frequency))) + # Remove the legend. Get rid of NA
+  geom_violin() + 
+  theme_minimal() +
+  scale_fill_brewer(palette = "Paired")
+ggplotly(p5)
+
+df %>% 
+  filter(!is.na(exercise_frequency)) %>% 
+  ggplot(aes(x=factor(exercise_frequency), y = sleep_efficiency, fill=factor(exercise_frequency))) +
+  geom_boxplot()
+```
+
+#deep sleep
+```{r, meesage=FALSE}
+deep_df %>% 
+  ggplot(aes(x=sleep_type_percentage, y = sleep_efficiency)) +
   geom_point() +
   geom_smooth(se=FALSE)
 
-p1 <- df_clean %>% 
-  ggplot(aes(x=occupation, y = quality_of_sleep, fill=occupation)) +
-  geom_violin()
-
-# Same as before but sleep duration. Put these two side by side
-p2 <- df_clean %>% 
-  ggplot(aes(x=occupation, y = sleep_duration, fill=occupation)) +
-  geom_violin()
-
-p1 + p2
-
-df_clean %>% 
-  ggplot(aes(x=sleep_disorder, y = quality_of_sleep, fill=sleep_disorder)) +
-  geom_violin() +
-  facet_wrap(~occupation)
-
-df_clean %>% 
-  ggplot(aes(x=sleep_disorder, y = quality_of_sleep, fill=sleep_disorder)) +
-  geom_violin()
-
+deep_df %>% 
+  filter(!is.na(awakenings)) %>% 
+  ggplot(aes(x=sleep_type_percentage, y = sleep_efficiency, color=factor(awakenings))) +
+  geom_point() +
+  geom_smooth(se=FALSE, method="lm") +
+  theme_minimal() +
+  scale_color_brewer(palette = "Set2") +
+  facet_wrap(~factor(awakenings), scales="free") # makes 0 awakenings kind of funny
 ```
 
-# Modeling
+#caffeine
+```{r, message=FALSE}
+deep_df %>% 
+  filter(!is.na(caffeine_consumption)) %>% 
+  ggplot(aes(x=factor(caffeine_consumption), y = sleep_efficiency, fill=factor(caffeine_consumption))) + # Drop NA. Probably better as a color or facet
+  geom_boxplot()
+```
+
+#awakenings,alcohol,smoking
+```{r, message=FALSE, warning=FALSE}
+df %>% 
+  filter(!is.na(alcohol_consumption)) %>% 
+  ggplot(aes(x=awakenings, y = sleep_efficiency, color=factor(alcohol_consumption))) + # Remove the legend. Get rid of NA
+  geom_smooth(method="lm", se=FALSE) +
+  facet_wrap(~smoking_status, scales="free") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_minimal()
+```
+
+#More modeling
 ```{r}
-mod3 <- glm(data=df_clean, formula = quality_of_sleep ~ age + occupation + stress_level)
-summary(mod3)
-plot(mod3$residuals)
+mod1 <- lm(data=deep_df, formula = sleep_efficiency ~ bedtime)
+mod2 <- lm(data=deep_df, formula = sleep_efficiency ~ 
+             age + awakenings + sleep_type_percentage)
+mod3 <- lm(data=deep_df, formula = sleep_efficiency ~ 
+             age * awakenings * sleep_type_percentage)
+mod4 <- lm(data=deep_df, formula = sleep_efficiency ~
+             age + awakenings + alcohol_consumption + smoking_status +
+             sleep_type_percentage)
+```
+
+#Find the "Find the name" residuals
+Mod1
+```{r}
+mean(mod1$residuals^2)
+```
+Mod2
+```{r}
+mean(mod2$residuals^2)
+```
+Mod3
+```{r}
 mean(mod3$residuals^2)
 ```
+Mod4
+```{r}
+mean(mod4$residuals^2)
+```
+
+Which is the best?
+```{r}
+compare_performance(mod1, mod2, mod3, mod4)
+compare_performance(mod1, mod2, mod3, mod4) %>% 
+  plot()
+```
+#Mod3 appears to be the best
+
+#Add predictions
+```{r}
+df2 <- add_predictions(deep_df, mod3)
+```
+
+#Make some hypothetical values for the independent variables in the model
+```{r}
+newdf <- data.frame(age = c(70, 8, 5, 80),
+                    awakenings = c(5, 1, 6, 3),
+                    sleep_type_percentage = c(49, 18, 45, 77))
+```
+
+#Make predictions
+```{r}
+pred <- predict(mod3, newdata=newdf)
+```
+
+#Combine hypothetical input data with hypothetical predictions into one new data frame
+```{r}
+hyp_preds <- data.frame(age = newdf$age,
+                        awakenings = newdf$awakenings,
+                        sleep_type_percentage = newdf$sleep_type_percentage,
+                        pred=pred)
+```
+#Add new column showing whether a data point is real or hypothetical
+```{r}
+df2$prediction_type <- "Real"
+hyp_preds$prediction_type <- "Hypothetical"
+```
+#Join real data and hypothetical data (with model predictions)
+```{r, message=FALSE}
+fullpreds <- full_join(df2, hyp_preds)
+```
+## 7. Plot the predictions alongside real data. ####
+```{r, warning=FALSE}
+ggplot(fullpreds, aes(x = sleep_type_percentage, y = pred, color = prediction_type)) +
+  geom_point(aes(y = sleep_efficiency), color = "Black", width = 1) +
+  geom_point() +
+  geom_smooth(method="lm", se=FALSE) +
+  theme_minimal() 
+```
+
+References
+
+National Sleep Foundation. (2024). Why do we need sleep? Sleep Foundation. Retrieved from https://www.sleepfoundation.org/how-sleep-works/why-do-we-need-sleep
