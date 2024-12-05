@@ -7,11 +7,11 @@ knitr::opts_chunk$set(echo = FALSE)
 library(xaringan)
 ```
 
-## [ABOUT ME](./media/26608295.jpg) | [CV](./media/26608295.jpg) | [BIOL-3100-Final-Project](./BIOL-3100-Final.html)##
+### [ABOUT ME](./media/26608295.jpg) | [CV](./media/26608295.jpg) | [BIOL-3100-Final-Project](./BIOL-3100-Final.html)###
 
-# **Suzanne Combs - Bioinformatics Student** #
+#### **Suzanne Combs - Bioinformatics Student** ####
 
-```{r echo=FALSE, fig.width=5,fig.height=5}
+```{r echo=FALSE, fig.width=4,fig.height=4}
 knitr::include_graphics("./media/portrait.jpg")
 ```
 
